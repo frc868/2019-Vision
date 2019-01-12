@@ -22,4 +22,4 @@ It's not done yet.
 
 ## When will it be done?
 
-¯\_(ツ)_/¯
+¯\\_(ツ)_/¯
