@@ -30,28 +30,32 @@ class DeepSpace2:
                 
         self.timer.start()
         
+        # convert to hsv colorspace
         hsv = cv2.cvtColor(raw,cv2.COLOR_BGR2HSV)
         
+        # filter based on hsv vales
         min = np.array([45, 50, 180])
         max = np.array([125, 255,255])
-        
-        
         filtered = cv2.inRange(hsv, min, max)
         
-        # kernel = np.ones((5,5),np.uint8)
-        # eroded = cv2.erode(filtered,kernel,iterations = 2)
-        # dilated = cv2.dilate(eroded,kernel,iterations = 4)
-                
+            # kernel = np.ones((5,5),np.uint8)
+            # eroded = cv2.erode(filtered,kernel,iterations = 2)
+            # dilated = cv2.dilate(eroded,kernel,iterations = 4)
+
+        # detect edges        
         edged = cv2.Canny(filtered, 30, 200)
         
-        cnts, hierarchy =   cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+        # detect contours
+        cnts, hierarchy = cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
         if (cnts is not None):
+            # find 10 contours of biggest area 
             cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:10]
         
             text = "No object detected"
             
             if (len(cnts) > 0):
+                # draw bounding box around object
                 x,y,w,h = cv2.boundingRect(cnts[0])
                 cv2.rectangle(raw,(x,y),(x+w,y+h),(0,255,0),2)
                 text = "position: (" + str(x) + "," + str(y) + "), height: " + str(h) + ", width: " + str(w)
