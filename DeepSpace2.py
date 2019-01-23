@@ -33,20 +33,19 @@ class DeepSpace2:
         
         hsv = cv2.cvtColor(raw,cv2.COLOR_BGR2HSV)
         
-        min = np.array([81,  0, 220])
-        max = np.array([110, 19, 255])
+        min = np.array([50,  200, 100])
+        max = np.array([180, 255, 255])
         filtered = cv2.inRange(hsv, min, max)
         
-            # kernel = np.ones((5,5),np.uint8)
-            # eroded = cv2.erode(filtered,kernel,iterations = 2)
-            # dilated = cv2.dilate(eroded,kernel,iterations = 4)
+        kernel = np.ones((2,2),np.uint8)
+        eroded = cv2.erode(filtered,kernel,iterations = 1)
+        dilated = cv2.dilate(eroded,kernel,iterations = 4)
 
-        edged = cv2.Canny(filtered, 30, 200)
-
+        edged = cv2.Canny(dilated, 30, 200)
              
         cnts, hierarchy = cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
-        if (cnts is not None):
+        if (cnts is not None) and (len(cnts) > 0):
             cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:10]
 
             box_one = cv2.boundingRect(cnts[0])
@@ -58,26 +57,18 @@ class DeepSpace2:
                     box_two = (x,y,w,h)
                     break
 
-            x0,y0,w0,h0 = box_one
-            x1,y1,w1,h1 = box_two
+            if box_one is not None:
+                x0,y0,w0,h0 = box_one
+                cv2.rectangle(raw,(x0,y0),(x0+w0,y0+h0),(0,255,0),2)
+                
+            if box_two is not None:
+                x1,y1,w1,h1 = box_two
+                cv2.rectangle(raw,(x1,y1),(x1+w1,y1+h1),(0,255,0),2)
 
-            cv2.rectangle(raw,(x0,y0),(x0+w0,y0+h0),(0,255,0),2)
-            cv2.rectangle(raw,(x1,y1),(x1+w1,y1+h1),(0,255,0),2)
+                dist = np.absolute(x0-x1)
+                mid = np.minimum(x0,x1) + dist/2
 
-            dist = np.absolute(x0-x1)
-            mid = np.minimum(x0,x1) + dist/2
-
-            text = "dist: " + str(dist) + " mid: " + str(mid)
-            
-            # if (len(cnts) > 0):
-            #     # draw bounding box around object
-            #     x,y,w,h = cv2.boundingRect(cnts[0])
-            #     cv2.rectangle(raw,(x,y),(x+w,y+h),(0,255,0),2)
-            #     text = "position: (" + str(x) + "," + str(y) + "), height: " + str(h) + ", width: " + str(w)
-
-            #     x,y,w,h = cv2.boundingRect(cnts[1])
-            #     cv2.rectangle(raw,(x,y),(x+w,y+h),(0,255,0),2)
-            #     text = "position: (" + str(x) + "," + str(y) + "), height: " + str(h) + ", width: " + str(w)
+                text = "dist: " + str(dist) + " mid: " + str(mid)
         
         outimg = raw
         
