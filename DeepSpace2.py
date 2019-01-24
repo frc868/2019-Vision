@@ -20,6 +20,48 @@ import numpy as np
 # @restrictions None
 # @ingroup modules
 
+class BoundingBox:
+    def __init__(self, box):
+        self.x = box[0]
+        self.y = box[1]
+        self.w = box[2]
+        self.h = box[3]
+
+    def getBox(self):
+        return (self.x,self.y,self.w,self.h)
+
+    def draw(self, img):
+        cv2.rectangle(img,(self.x,self.y),(self.x+self.w,self.y+self.h),(0,255,0),2)
+        
+class FitLine:
+    def __init__(self, line):
+        self.vx = line[0]
+        self.vy = line[1]
+        self.lx = line[2]
+        self.ly = line[3]
+    
+    def slope(self):
+        return float(self.vy/self.vx)
+
+    def getLine(self):
+        return (self.vx,self.vy,self.lx,self.ly)
+
+    def draw(self, img):
+        point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
+        point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
+        cv2.line(img, point0, point1, (0,255,0), 2)
+
+
+class DetectedObject:
+    def __init__(self, contour):
+        self.contour = contour
+        self.box = BoundingBox(cv2.boundingRect(contour))
+        self.line = FitLine(cv2.fitLine(contour, cv2.DIST_L2,0,0.01,0.01))
+
+    def draw(self, img):
+        self.box.draw(img)
+        self.line.draw(img)
+
 class DeepSpace2:
     
     def __init__(self):
@@ -31,46 +73,58 @@ class DeepSpace2:
                 
         self.timer.start()
         
+        # --- HSV FILTER ---
         hsv = cv2.cvtColor(raw,cv2.COLOR_BGR2HSV)
         
-        min = np.array([50,  200, 100])
+        #               H    S    V
+        min = np.array([50,  210, 180])
         max = np.array([180, 255, 255])
         filtered = cv2.inRange(hsv, min, max)
         
+        # --- ERODE/DILATE ---
         kernel = np.ones((2,2),np.uint8)
         eroded = cv2.erode(filtered,kernel,iterations = 1)
         dilated = cv2.dilate(eroded,kernel,iterations = 4)
 
         edged = cv2.Canny(dilated, 30, 200)
-             
+
+        # --- CONTOURS ---
         cnts, hierarchy = cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+        rows, cols = dilated.shape[:2]
+        
+        editimg = raw
 
         if (cnts is not None) and (len(cnts) > 0):
-            cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:10]
+            objs = [DetectedObject(c) for c in cnts]
+            def xPos(obj):
+                return obj.box.x
 
-            box_one = cv2.boundingRect(cnts[0])
-            box_two = None
+            objs = sorted(objs, key=xPos)
+            pairs = []
 
-            for c in cnts:
-                x,y,w,h = cv2.boundingRect(c)
-                if (np.absolute(box_one[0] - x) > box_one[2]):
-                    box_two = (x,y,w,h)
-                    break
+            slopes = []
 
-            if box_one is not None:
-                x0,y0,w0,h0 = box_one
-                cv2.rectangle(raw,(x0,y0),(x0+w0,y0+h0),(0,255,0),2)
-                
-            if box_two is not None:
-                x1,y1,w1,h1 = box_two
-                cv2.rectangle(raw,(x1,y1),(x1+w1,y1+h1),(0,255,0),2)
+            for i in range(len(objs)-1):
+                slope0 = int(objs[i].line.slope())
+                slope1 = int(objs[i+1].line.slope())
+                slopes.append((slope0,slope1))
+                if (slope0 < 0 and slope1 > 0):
+                    pairs.append((objs[i], objs[i+1]))
 
-                dist = np.absolute(x0-x1)
-                mid = np.minimum(x0,x1) + dist/2
+            def pairArea(pair):
+                return cv2.contourArea(pair[0].contour) + cv2.contourArea(pair[1].contour)
 
-                text = "dist: " + str(dist) + " mid: " + str(mid)
+            if (len(pairs) > 0):
+                pairs = sorted(pairs, key=pairArea, reverse=True)
+                text = str([pairArea(pair) for pair in pairs])
+                topPair = pairs[0]
+
+
+                topPair[0].draw(editimg)
+                topPair[1].draw(editimg)
+            
         
-        outimg = raw
+        outimg = editimg
         
         cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
         
