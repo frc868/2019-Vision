@@ -39,8 +39,11 @@ class BoundingBox:
     def position(box0, box1):
         return box0.x + distance(box0, box1)/2
 
+    def height_difference(box0, box1):
+        return box0.h - box1.h
+
     def calculate(box0, box1):
-        return self.distance(box0, box1), self.position(box0, box1)
+        return self.distance(box0, box1), self.position(box0, box1), self.height_difference(box0, box1)
         
 class FitLine:
     def __init__(self, line):
@@ -134,8 +137,8 @@ class DeepSpace2:
                 top1.draw(editimg)
 
                 # get calculations 
-                dist, pos = BoundingBox.calculate(top0.box, top1.box)
-                text = "Dist: " + str(dist) + "Pos: " + str(pos)
+                dist, pos, h_diff = BoundingBox.calculate(top0.box, top1.box)
+                text = "Dist: " + str(dist) + " Pos: " + str(pos) + " H_Diff: " + str(h_diff)
             
         
         outimg = editimg # could be set to: raw, filtered, eroded, dialated, edged, editimg
