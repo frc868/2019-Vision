@@ -32,6 +32,15 @@ class BoundingBox:
 
     def draw(self, img):
         cv2.rectangle(img,(self.x,self.y),(self.x+self.w,self.y+self.h),(0,255,0),2)
+
+    def distance(box0, box1):
+        return box0.x - box1.x
+
+    def position(box0, box1):
+        return box0.x + distance(box0, box1)/2
+
+    def calculate(box0, box1):
+        return self.distance(box0, box1), self.position(box0, box1)
         
 class FitLine:
     def __init__(self, line):
@@ -70,68 +79,69 @@ class DeepSpace2:
     def process(self, inframe, outframe):
         text = ""
         raw = inframe.getCvBGR()
-                
-        self.timer.start()
-        
-        # --- HSV FILTER ---
+                    
+        # filter by hsv values
         hsv = cv2.cvtColor(raw,cv2.COLOR_BGR2HSV)
-        
-        #               H    S    V
         min = np.array([50,  210, 180])
         max = np.array([180, 255, 255])
         filtered = cv2.inRange(hsv, min, max)
         
-        # --- ERODE/DILATE ---
+        # erode and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
         eroded = cv2.erode(filtered,kernel,iterations = 1)
         dilated = cv2.dilate(eroded,kernel,iterations = 4)
 
+        # detect edges
         edged = cv2.Canny(dilated, 30, 200)
 
-        # --- CONTOURS ---
+        # get contours of image
         cnts, hierarchy = cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
-        rows, cols = dilated.shape[:2]
         
-        editimg = raw
+        editimg = raw.copy()
 
         if (cnts is not None) and (len(cnts) > 0):
+
+            # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
+
+            # sort objects by x value
             def xPos(obj):
                 return obj.box.x
 
             objs = sorted(objs, key=xPos)
+
+            # create list of pairs of objects based on fitline's slope
             pairs = []
-
-            slopes = []
-
             for i in range(len(objs)-1):
                 slope0 = int(objs[i].line.slope())
                 slope1 = int(objs[i+1].line.slope())
-                slopes.append((slope0,slope1))
+
                 if (slope0 < 0 and slope1 > 0):
                     pairs.append((objs[i], objs[i+1]))
 
-            def pairArea(pair):
-                return cv2.contourArea(pair[0].contour) + cv2.contourArea(pair[1].contour)
-
             if (len(pairs) > 0):
+                # sort pairs by total area
+                def pairArea(pair):
+                    return cv2.contourArea(pair[0].contour) + cv2.contourArea(pair[1].contour)
+
                 pairs = sorted(pairs, key=pairArea, reverse=True)
-                text = str([pairArea(pair) for pair in pairs])
-                topPair = pairs[0]
 
+                # get objects of top pair
+                top0, top1 = pairs[0]
 
-                topPair[0].draw(editimg)
-                topPair[1].draw(editimg)
+                # draw boxes and lines of these objects
+                top0.draw(editimg)
+                top1.draw(editimg)
+
+                # get calculations 
+                dist, pos = BoundingBox.calculate(top0.box, top1.box)
+                text = "Dist: " + str(dist) + "Pos: " + str(pos)
             
         
-        outimg = editimg
+        outimg = editimg # could be set to: raw, filtered, eroded, dialated, edged, editimg
         
+        # put text on the image
         cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
-        
-        fps = self.timer.stop()
-        height = outimg.shape[0]
-        width = outimg.shape[1]
-        cv2.putText(outimg, fps, (3, height - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
-        
+
         outframe.sendCv(outimg)
         
