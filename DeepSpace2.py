@@ -6,7 +6,7 @@ import numpy as np
 #
 # Add some description of your module here.
 #
-# @author Armaan Goel
+# @author Armaan Goel, Skyler Cleland, Hazel Levine
 # 
 # @videomapping YUYV 320 240 30 YUYV 320 240 30 TechHOUNDS DeepSpace2
 # @email armaangoel78@gmail.com
