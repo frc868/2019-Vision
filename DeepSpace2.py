@@ -61,7 +61,7 @@ class FitLine:
     def draw(self, img):
         point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
         point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
-        cv2.line(img, point0, point1, (0,255,0), 2)
+        cv2.line(img, point0, point1, (0,0,255), 2)
 
 
 class DetectedObject:
