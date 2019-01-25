@@ -34,16 +34,16 @@ class BoundingBox:
         cv2.rectangle(img,(self.x,self.y),(self.x+self.w,self.y+self.h),(0,255,0),2)
 
     def distance(box0, box1):
-        return box0.x - box1.x
+        return box1.x - box0.x
 
     def position(box0, box1):
-        return box0.x + distance(box0, box1)/2
+        return box0.x + BoundingBox.distance(box0, box1)/2
 
     def height_difference(box0, box1):
         return box0.h - box1.h
 
     def calculate(box0, box1):
-        return self.distance(box0, box1), self.position(box0, box1), self.height_difference(box0, box1)
+        return BoundingBox.distance(box0, box1), BoundingBox.position(box0, box1), BoundingBox.height_difference(box0, box1)
         
 class FitLine:
     def __init__(self, line):
@@ -61,7 +61,7 @@ class FitLine:
     def draw(self, img):
         point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
         point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
-        cv2.line(img, point0, point1, (0,0,255), 2)
+        cv2.line(img, point0, point1, (255,0,0), 2)
 
 
 class DetectedObject:
@@ -81,6 +81,7 @@ class DeepSpace2:
         
     def process(self, inframe, outframe):
         text = ""
+        data = ",,"
         raw = inframe.getCvBGR()
                     
         # filter by hsv values
@@ -139,12 +140,14 @@ class DeepSpace2:
                 # get calculations 
                 dist, pos, h_diff = BoundingBox.calculate(top0.box, top1.box)
                 text = "Dist: " + str(dist) + " Pos: " + str(pos) + " H_Diff: " + str(h_diff)
+                data = str(dist) + "," + str(pos) + "," + str(h_diff)
             
         
         outimg = editimg # could be set to: raw, filtered, eroded, dialated, edged, editimg
         
         # put text on the image
         cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
+        jevois.sendSerial(data)
 
         outframe.sendCv(outimg)
         
