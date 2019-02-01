@@ -37,7 +37,7 @@ class BoundingBox:
         return box1.x - box0.x
 
     def position(box0, box1):
-        return box0.x + BoundingBox.distance(box0, box1)/2
+        return (box0.x + BoundingBox.distance(box0, box1)/2) - 320
 
     def height_difference(box0, box1):
         return box0.h - box1.h
