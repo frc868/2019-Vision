@@ -46,7 +46,7 @@ class BoundingBox:
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
-               BoundingBox.height_ratio(boxL, boxR)
+               BoundingBox.height_difference(boxL, boxR)
         
 class FitLine:
     def __init__(self, line):
@@ -77,6 +77,24 @@ class DetectedObject:
         self.box.draw(img)
         self.line.draw(img)
 
+class ValueBuffer:
+    def __init__(self, buffer_size):
+        self.buffer_size = buffer_size
+        self.buffer = []
+
+    def addValue(self, value):
+        if (len(self.buffer) < self.buffer_size):
+            self.buffer.append(value)
+        else:
+            self.buffer = self.buffer[1:]
+            self.buffer.append(value)
+
+    def average(self):
+        return np.average(self.buffer)
+
+    def median(self):
+        return np.median(self.buffer)
+
 class DeepSpace:
     def __init__(self):
         self.timer = jevois.Timer("processing timer", 100, jevois.LOG_INFO)
@@ -84,32 +102,27 @@ class DeepSpace:
     def run(self, inframe):
         text = ""
         data = ",,"
+        buffer_size = 5
+
+        distBuffer = ValueBuffer(buffer_size)
+        posBuffer = ValueBuffer(buffer_size)
+        hRatioBuffer = ValueBuffer(buffer_size)
+
         raw = inframe.getCvBGR()
         
         blurred = cv2.blur(raw,(2, 2))
 
                     
         # filter by hsv values
-        hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
-        hmin = np.array([53, 144, 41])
-        hmax = np.array([96, 255, 255])
-        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-        hfiltered = cv2.inRange(hsv, hmin, hmax)
-        
-        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
-        rmin = np.array([0, 0, 100])
-        rmax = np.array([20, 255, 200])
-        rfiltered = cv2.inRange(rgb, rmin, rmax)
-        
-        hrmask = cv2.bitwise_or(hfiltered, rfiltered)
-        filtered = cv2.bitwise_and(raw, raw, mask=hrmask)
-        filtered = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(blurred,cv2.COLOR_BGR2HSV)
+        min = np.array([53,  144, 41])
+        max = np.array([96, 255, 255])
+        filtered = cv2.inRange(hsv, min, max)
         
         # erode and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
         eroded = cv2.erode(filtered.copy(),kernel,iterations = 2)
-        blurred = cv2.blur(eroded.copy(), (2, 2))
-        dilated = cv2.dilate(blurred.copy(),kernel,iterations = 2)
+        dilated = cv2.dilate(eroded.copy(),kernel,iterations = 2)
 
         # detect edges
         edged = cv2.Canny(dilated.copy(), 30, 200)
@@ -169,6 +182,15 @@ class DeepSpace:
 
                 # retrieve and store data 
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
+
+                distBuffer.addValue(dist)
+                posBuffer.addValue(pos)
+                hRatioBuffer.addValue(h_ratio)
+
+                dist = distBuffer.median()
+                pos = posBuffer.median()
+                h_ratio = hRatioBuffer.median()
+
                 text = "Dist: " + str(dist) + " Pos: " + str(pos) \
                        + " H_Ratio: " + str(h_ratio)
                 data = str(dist) + "," + str(pos) + "," + str(h_ratio)
