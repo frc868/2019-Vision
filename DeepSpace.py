@@ -116,9 +116,9 @@ class DeepSpace:
         hsvfiltered = cv2.inRange(hsv, hsvmin, hsvmax)
 
         # filter by rgb values
-        rgb = cv2.cvtColor(blurred, cv2.COLOR_BGR2RGB)
-        rgbmin = np.array([0, 0, 100])
-        rgbmax = np.array([20, 255, 200])
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        rgbmin = np.array([0, 100, 75])
+        rgbmax = np.array([100, 255, 200])
         rgbfiltered = cv2.inRange(rgb, rgbmin, rgbmax)
 
         # combine both filtered version into one image
@@ -126,9 +126,9 @@ class DeepSpace:
         
         # erode, blur and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
-        eroded = cv2.erode(filtered.copy(), kernel, iterations = 2)
-        blurred = cv2.blur(eroded.copy(), kernel)
-        dilated = cv2.dilate(blurred.copy(), kernel, iterations = 2)
+        eroded = cv2.erode(filtered.copy(), kernel, iterations = 1)
+        #blurred = cv2.blur(eroded.copy(), (2, 2))
+        dilated = cv2.dilate(eroded.copy(), kernel, iterations = 2)
 
 
         # detect edges
@@ -191,20 +191,20 @@ class DeepSpace:
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
 
                 # add newest calculations to respective buffers
-                distBuffer.addValue(dist)
-                posBuffer.addValue(pos)
-                hRatioBuffer.addValue(h_ratio)
+                #self.distBuffer.addValue(dist)
+                #self.posBuffer.addValue(pos)
+                #self.hRatioBuffer.addValue(h_ratio)
 
                 # set the data to send to the median of the buffer
-                dist = distBuffer.median()
-                pos = posBuffer.median()
-                h_ratio = hRatioBuffer.median()
+                #dist = self.distBuffer.median()
+                #pos = self.posBuffer.median()
+                #h_ratio = self.hRatioBuffer.median()
 
                 text = "Dist: " + str(dist) + " Pos: " + str(pos) \
                        + " H_Ratio: " + str(h_ratio)
                 data = str(dist) + "," + str(pos) + "," + str(h_ratio)
 
-        # could be set to: raw, filtered, eroded, dilated, edged, editimg
+        # could be set to: raw, {hsv,rgb}filtered, eroded, dilated, edged, editimg
         outframe = editimg
 
         return outframe, text, data
