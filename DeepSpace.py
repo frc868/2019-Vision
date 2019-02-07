@@ -31,13 +31,14 @@ class BoundingBox:
         return (self.x,self.y,self.w,self.h)
 
     def draw(self, img):
-        cv2.rectangle(img,(self.x,self.y),(self.x+self.w,self.y+self.h),(0,255,0),2)
+        cv2.rectangle(img,(self.x,self.y), \
+                     (self.x+self.w,self.y+self.h),(0,255,0),2)
 
     def distance(box0, box1):
         return box1.x - box0.x
 
     def position(box0, box1):
-        return box0.x + BoundingBox.distance(box0, box1)/2
+        return (box0.x + BoundingBox.distance(box0, box1)/2)
 
     def height_difference(box0, box1):
         return box0.h - box1.h
@@ -86,21 +87,34 @@ class DeepSpace:
         raw = inframe.getCvBGR()
                     
         # filter by hsv values
-        hsv = cv2.cvtColor(raw,cv2.COLOR_BGR2HSV)
-        min = np.array([65,  240, 23])
-        max = np.array([81, 255, 255])
-        filtered = cv2.inRange(hsv, min, max)
+        hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
+        hmin = np.array([53, 144, 41])
+        hmax = np.array([96, 255, 255])
+        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+        hfiltered = cv2.inRange(hsv, hmin, hmax)
+        
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        rmin = np.array([0, 0, 100])
+        rmax = np.array([20, 255, 200])
+        rfiltered = cv2.inRange(rgb, rmin, rmax)
+        
+        hrmask = cv2.bitwise_or(hfiltered, rfiltered)
+        filtered = cv2.bitwise_and(raw, raw, mask=hrmask)
+        filtered = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)
         
         # erode and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
-        eroded = cv2.erode(filtered.copy(),kernel,iterations = 1)
-        dilated = cv2.dilate(eroded.copy(),kernel,iterations = 4)
+        eroded = cv2.erode(filtered.copy(),kernel,iterations = 2)
+        blurred = cv2.blur(eroded.copy(), (2, 2))
+        dilated = cv2.dilate(blurred.copy(),kernel,iterations = 2)
 
         # detect edges
-        edged = cv2.Canny(filtered.copy(), 30, 200)
+        edged = cv2.Canny(dilated.copy(), 30, 200)
 
         # get contours of image
-        cnts, hierarchy = cv2.findContours(edged.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+        cnts, hierarchy = cv2.findContours(edged.copy(), \
+                                           cv2.RETR_LIST, \
+                                           cv2.CHAIN_APPROX_SIMPLE)
         
         editimg = raw.copy()
 
@@ -111,7 +125,7 @@ class DeepSpace:
             # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
 
-            [obj.draw(editimg) for obj in objs]
+            #[obj.draw(editimg) for obj in objs]
 
             # sort objects by x value
             def xPos(obj):
@@ -129,9 +143,10 @@ class DeepSpace:
                     pairs.append((objs[i], objs[i+1]))
 
             if (len(pairs) > 0):
-                # sort pairs by total area
+                # sort pairs by area of both boxes
                 def pairArea(pair):
-                    return cv2.contourArea(pair[0].contour) + cv2.contourArea(pair[1].contour)
+                    return cv2.contourArea(pair[0].contour) \
+                           + cv2.contourArea(pair[1].contour)
 
                 pairs = sorted(pairs, key=pairArea, reverse=True)
 
@@ -142,24 +157,25 @@ class DeepSpace:
                 top0.draw(editimg)
                 top1.draw(editimg)
 
-                # get calculations 
+                # retrieve and store data 
                 dist, pos, h_diff = BoundingBox.calculate(top0.box, top1.box)
-                text = "Dist: " + str(dist) + " Pos: " + str(pos) + " H_Diff: " + str(h_diff)
+                text = "Dist: " + str(dist) + " Pos: " + str(pos) \
+                       + " H_Diff: " + str(h_diff)
                 data = str(dist) + "," + str(pos) + "," + str(h_diff)
 
-        outframe = editimg # could be set to: raw, filtered, eroded, dialated, edged, editimg
-
+        # could be set to: raw, filtered, eroded, dilated, edged, editimg
+        outframe = editimg
         return outframe, text, data
 
     def process(self, inframe, outframe):
         outimg, text, data = self.run(inframe)
-        cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
+        cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, \
+                    0.5, (255,255,255))
         outframe.sendCv(outimg)
         jevois.sendSerial(data)
 
 
     def processNoUSB(self, inframe):
-        outframe, data = self.run(inframe)
-        self.sendImage(outframe, editimg, text) 
+        _, _, data = self.run(inframe)
         jevois.sendSerial(data)
         
