@@ -34,19 +34,19 @@ class BoundingBox:
         cv2.rectangle(img,(self.x,self.y), \
                      (self.x+self.w,self.y+self.h),(0,255,0),2)
 
-    def distance(box0, box1):
-        return box1.x - box0.x
+    def distance(boxL, boxR):
+        return boxR.x - boxL.x
 
-    def position(box0, box1):
-        return (box0.x + BoundingBox.distance(box0, box1)/2)
+    def position(boxL, boxR):
+        return (boxL.x + BoundingBox.distance(boxL, boxR)/2)
 
-    def height_difference(box0, box1):
-        return box0.h - box1.h
+    def height_ratio(boxL, boxR):
+        return boxL.h/boxR.h
 
-    def calculate(box0, box1):
-        return BoundingBox.distance(box0, box1), \
-               BoundingBox.position(box0, box1), \
-               BoundingBox.height_difference(box0, box1)
+    def calculate(boxL, boxR):
+        return BoundingBox.distance(boxL, boxR), \
+               BoundingBox.position(boxL, boxR), \
+               BoundingBox.height_difference(boxL, boxR)
         
 class FitLine:
     def __init__(self, line):
@@ -85,6 +85,9 @@ class DeepSpace:
         text = ""
         data = ",,"
         raw = inframe.getCvBGR()
+        
+        blurred = cv2.blur(raw,(2, 2))
+
                     
         # filter by hsv values
         hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
@@ -153,18 +156,26 @@ class DeepSpace:
                 # get objects of top pair
                 top0, top1 = pairs[0]
 
+                if (top0.box.x < top1.box.x):
+                    topL = top0
+                    topR = top1
+                else:
+                    topL = top1
+                    topR = top0
+
                 # draw boxes and lines of these objects
-                top0.draw(editimg)
-                top1.draw(editimg)
+                topL.draw(editimg)
+                topR.draw(editimg)
 
                 # retrieve and store data 
-                dist, pos, h_diff = BoundingBox.calculate(top0.box, top1.box)
+                dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
                 text = "Dist: " + str(dist) + " Pos: " + str(pos) \
-                       + " H_Diff: " + str(h_diff)
-                data = str(dist) + "," + str(pos) + "," + str(h_diff)
+                       + " H_Ratio: " + str(h_ratio)
+                data = str(dist) + "," + str(pos) + "," + str(h_ratio)
 
         # could be set to: raw, filtered, eroded, dilated, edged, editimg
         outframe = editimg
+
         return outframe, text, data
 
     def process(self, inframe, outframe):
