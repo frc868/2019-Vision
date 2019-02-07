@@ -97,22 +97,20 @@ class ValueBuffer:
 
 class DeepSpace:
     def __init__(self):
-        self.timer = jevois.Timer("processing timer", 100, jevois.LOG_INFO)
+        buffer_size = 5
+
+        # create buffer objects for each value type
+        self.distBuffer = ValueBuffer(buffer_size)
+        self.posBuffer = ValueBuffer(buffer_size)
+        self.hRatioBuffer = ValueBuffer(buffer_size)
 
     def run(self, inframe):
         text = ""
         data = ",,"
-        buffer_size = 5
-
-        distBuffer = ValueBuffer(buffer_size)
-        posBuffer = ValueBuffer(buffer_size)
-        hRatioBuffer = ValueBuffer(buffer_size)
-
         raw = inframe.getCvBGR()
         
         blurred = cv2.blur(raw,(2, 2))
 
-                    
         # filter by hsv values
         hsv = cv2.cvtColor(blurred,cv2.COLOR_BGR2HSV)
         min = np.array([53,  144, 41])
@@ -183,10 +181,12 @@ class DeepSpace:
                 # retrieve and store data 
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
 
+                # add newest calculations to respective buffers
                 distBuffer.addValue(dist)
                 posBuffer.addValue(pos)
                 hRatioBuffer.addValue(h_ratio)
 
+                # set the data to send to the median of the buffer
                 dist = distBuffer.median()
                 pos = posBuffer.median()
                 h_ratio = hRatioBuffer.median()
@@ -201,14 +201,24 @@ class DeepSpace:
         return outframe, text, data
 
     def process(self, inframe, outframe):
+        # process the image and get the output image and the serial data 
         outimg, text, data = self.run(inframe)
+
+        # write vision calculations on camera
         cv2.putText(outimg, text, (3, 20), cv2.FONT_HERSHEY_SIMPLEX, \
                     0.5, (255,255,255))
+
+        # send the image
         outframe.sendCv(outimg)
+
+        # send the serial data
         jevois.sendSerial(data)
 
 
     def processNoUSB(self, inframe):
+        # process the image and get just the serial data
         _, _, data = self.run(inframe)
+
+        # send the serial data
         jevois.sendSerial(data)
         
