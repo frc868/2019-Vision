@@ -46,7 +46,7 @@ class BoundingBox:
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
-               BoundingBox.height_difference(boxL, boxR)
+               BoundingBox.height_ratio(boxL, boxR)
         
 class FitLine:
     def __init__(self, line):
@@ -109,18 +109,27 @@ class DeepSpace:
         data = ",,"
         raw = inframe.getCvBGR()
         
-        blurred = cv2.blur(raw,(2, 2))
-
         # filter by hsv values
-        hsv = cv2.cvtColor(blurred,cv2.COLOR_BGR2HSV)
-        min = np.array([53,  144, 41])
-        max = np.array([96, 255, 255])
-        filtered = cv2.inRange(hsv, min, max)
+        hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
+        hsvmin = np.array([53,  144, 41])
+        hsvmax = np.array([96, 255, 255])
+        hsvfiltered = cv2.inRange(hsv, hsvmin, hsvmax)
+
+        # filter by rgb values
+        rgb = cv2.cvtColor(blurred, cv2.COLOR_BGR2RGB)
+        rgbmin = np.array([0, 0, 100])
+        rgbmax = np.array([20, 255, 200])
+        rgbfiltered = cv2.inRange(rgb, rgbmin, rgbmax)
+
+        # combine both filtered version into one image
+        filtered = cv2.bitwise_and(hsvfiltered, rgbfiltered)
         
-        # erode and dialate to remove noise
+        # erode, blur and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
-        eroded = cv2.erode(filtered.copy(),kernel,iterations = 2)
-        dilated = cv2.dilate(eroded.copy(),kernel,iterations = 2)
+        eroded = cv2.erode(filtered.copy(), kernel, iterations = 2)
+        blurred = cv2.blur(eroded.copy(), kernel)
+        dilated = cv2.dilate(blurred.copy(), kernel, iterations = 2)
+
 
         # detect edges
         edged = cv2.Canny(dilated.copy(), 30, 200)
