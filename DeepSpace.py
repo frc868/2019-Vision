@@ -46,7 +46,7 @@ class BoundingBox:
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
-               BoundingBox.height_difference(boxL, boxR)
+               BoundingBox.height_ratio(boxL, boxR)
         
 class FitLine:
     def __init__(self, line):
