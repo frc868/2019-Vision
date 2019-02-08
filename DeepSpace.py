@@ -76,6 +76,28 @@ class DetectedObject:
     def draw(self, img):
         self.box.draw(img)
         self.line.draw(img)
+        
+    def remove_dups(objs):
+        def area(obj):
+            return obj.box.w * obj.box.h
+        objs = sorted(objs, key=area)
+        
+        new_objs = []
+        
+        for i in range(len(objs)):
+            obj = objs[i]
+            
+            dup = False
+            for x in range(len(new_objs)):
+                box0 = obj.box
+                box1 = new_objs[x].box
+                if (BoundingBox.distance(box0, box1) < (box0.w + box1.w)/4):
+                    dup = True
+                    
+            if (not dup):
+                new_objs.append(obj)
+                
+        return new_objs
 
 class ValueBuffer:
     def __init__(self, buffer_size):
@@ -117,8 +139,8 @@ class DeepSpace:
 
         # filter by rgb values
         rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
-        rgbmin = np.array([0, 100, 75])
-        rgbmax = np.array([100, 255, 200])
+        rgbmin = np.array([0, 150, 75])
+        rgbmax = np.array([100, 255, 255])
         rgbfiltered = cv2.inRange(rgb, rgbmin, rgbmax)
 
         # combine both filtered version into one image
@@ -146,7 +168,7 @@ class DeepSpace:
             cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
 
             # create a detected object for each contour
-            objs = [DetectedObject(c) for c in cnts]
+            objs = DetectedObject.remove_dups([DetectedObject(c) for c in cnts])
 
             #[obj.draw(editimg) for obj in objs]
 
@@ -162,7 +184,7 @@ class DeepSpace:
                 slope0 = int(objs[i].line.slope())
                 slope1 = int(objs[i+1].line.slope())
 
-                if (slope0 < 0 and slope1 > 0):
+                if (slope1 - slope0 >= 0):
                     pairs.append((objs[i], objs[i+1]))
 
             if (len(pairs) > 0):
@@ -174,14 +196,7 @@ class DeepSpace:
                 pairs = sorted(pairs, key=pairArea, reverse=True)
 
                 # get objects of top pair
-                top0, top1 = pairs[0]
-
-                if (top0.box.x < top1.box.x):
-                    topL = top0
-                    topR = top1
-                else:
-                    topL = top1
-                    topR = top0
+                topL, topR = pairs[0]
 
                 # draw boxes and lines of these objects
                 topL.draw(editimg)
@@ -191,14 +206,14 @@ class DeepSpace:
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
 
                 # add newest calculations to respective buffers
-                #self.distBuffer.addValue(dist)
-                #self.posBuffer.addValue(pos)
-                #self.hRatioBuffer.addValue(h_ratio)
+                self.distBuffer.addValue(dist)
+                self.posBuffer.addValue(pos)
+                self.hRatioBuffer.addValue(h_ratio)
 
                 # set the data to send to the median of the buffer
-                #dist = self.distBuffer.median()
-                #pos = self.posBuffer.median()
-                #h_ratio = self.hRatioBuffer.median()
+                dist = self.distBuffer.median()
+                pos = self.posBuffer.median()
+                h_ratio = self.hRatioBuffer.median()
 
                 text = "Dist: " + str(dist) + " Pos: " + str(pos) \
                        + " H_Ratio: " + str(h_ratio)
