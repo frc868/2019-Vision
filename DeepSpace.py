@@ -61,6 +61,21 @@ class FitLine:
     def getLine(self):
         return (self.vx,self.vy,self.lx,self.ly)
 
+    def getIntersection(line0, line1):
+        slope0 = line0.slope()
+        slope1 = line1.slope()
+        x0 = line0.lx
+        x1 = line1.lx
+        y0 = line0.ly
+        y1 = line1.ly
+        a = np.array([[-slope0, 1], [-slope1, 1]])
+        b = np.array([slope0 + y0, slope1 + y1])
+
+        return np.linalg.solve(a,b)
+        
+    def isValidPair(line0, line1):
+        return FitLine.getIntersection(line0, line1)[1] < (line0.ly + line1.ly)/2
+
     def draw(self, img):
         point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
         point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
@@ -76,28 +91,21 @@ class DetectedObject:
     def draw(self, img):
         self.box.draw(img)
         self.line.draw(img)
-        
+
     def remove_dups(objs):
-        def area(obj):
-            return obj.box.w * obj.box.h
-        objs = sorted(objs, key=area)
+        def xPos(obj):
+            return obj.box.x
+        objs = sorted(objs, key=xPos)
         
-        new_objs = []
-        
-        for i in range(len(objs)):
-            obj = objs[i]
-            
-            dup = False
-            for x in range(len(new_objs)):
-                box0 = obj.box
-                box1 = new_objs[x].box
-                if (BoundingBox.distance(box0, box1) < (box0.w + box1.w)/4):
-                    dup = True
-                    
-            if (not dup):
-                new_objs.append(obj)
+        i = 0
+        while (i < len(objs) - 1):
+            box0 = objs[i].box
+            box1 = objs[i+1].box
+            if (BoundingBox.distance(box0,box1) > (box0.w + box1.w)/2):
+                objs.remove(objs[0])
+            i += 1
                 
-        return new_objs
+        return objs
 
 class ValueBuffer:
     def __init__(self, buffer_size):
@@ -168,7 +176,9 @@ class DeepSpace:
             cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
 
             # create a detected object for each contour
-            objs = DetectedObject.remove_dups([DetectedObject(c) for c in cnts])
+            objs = [DetectedObject(c) for c in cnts]
+            #[obj.draw(editimg) for obj in objs]
+            objs = DetectedObject.remove_dups(objs)
 
             #[obj.draw(editimg) for obj in objs]
 
@@ -181,10 +191,10 @@ class DeepSpace:
             # create list of pairs of objects based on fitline's slope
             pairs = []
             for i in range(len(objs)-1):
-                slope0 = int(objs[i].line.slope())
-                slope1 = int(objs[i+1].line.slope())
+                line0 = objs[i].line
+                line1 = objs[i+1].line
 
-                if (slope1 - slope0 >= 0):
+                if (FitLine.isValidPair(line0, line1)):
                     pairs.append((objs[i], objs[i+1]))
 
             if (len(pairs) > 0):
