@@ -14,12 +14,12 @@ The 2019 game.
 
 ## Can I use it?
 
-No.
+Yes.
 
-## Why not?
+## Why?
 
-It's not done yet.
+It works, I think.
 
 ## When will it be done?
 
-¯\\\_(ツ)\_/¯
+¯Now. \\\_(ツ)\_/¯
