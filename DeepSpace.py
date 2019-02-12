@@ -72,10 +72,7 @@ class FitLine:
         b = np.array([slope0 + y0, slope1 + y1])
 
         return np.linalg.solve(a,b)
-        
-    def isValidPair(line0, line1):
-        return FitLine.getIntersection(line0, line1)[1] < (line0.ly + line1.ly)/2
-
+       
     def draw(self, img):
         point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
         point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
@@ -101,11 +98,18 @@ class DetectedObject:
         while (i < len(objs) - 1):
             box0 = objs[i].box
             box1 = objs[i+1].box
-            if (BoundingBox.distance(box0,box1) > (box0.w + box1.w)/2):
-                objs.remove(objs[0])
+            if (BoundingBox.distance(box0,box1) < (box0.w + box1.w)/2):
+                objs.remove(objs[i])
             i += 1
                 
         return objs
+        
+    def isValidPair(obj0, obj1):
+        line0 = obj0.line
+        line1 = obj1.line
+        box0 = obj0.box
+        box1 = obj1.box
+        return FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
 
 class ValueBuffer:
     def __init__(self, buffer_size):
@@ -191,11 +195,13 @@ class DeepSpace:
             # create list of pairs of objects based on fitline's slope
             pairs = []
             for i in range(len(objs)-1):
-                line0 = objs[i].line
-                line1 = objs[i+1].line
+                obj0 = objs[i]
+                obj1 = objs[i+1]
 
-                if (FitLine.isValidPair(line0, line1)):
+                if (DetectedObject.isValidPair(obj0, obj1)):
                     pairs.append((objs[i], objs[i+1]))
+                else:
+                    data = "Intersection: " + str((line0.ly + line1.ly)/2 - FitLine.getIntersection(line0, line1)[1])
 
             if (len(pairs) > 0):
                 # sort pairs by area of both boxes
