@@ -43,6 +43,7 @@ class BoundingBox:
     def height_ratio(boxL, boxR):
         return boxL.h/boxR.h
 
+    # distance, position, h ratio
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
@@ -109,7 +110,24 @@ class DetectedObject:
         line1 = obj1.line
         box0 = obj0.box
         box1 = obj1.box
-        return FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
+        
+        def yPos(obj):
+            return obj.box.y
+
+        # the further away we get, the less pixels bounding boxes take up
+        # so we need to scale it by distance between the two boxes
+        box_dist = BoundingBox.distance(box0, box1)
+        y_deadband = box_dist * 0.15 # tune as needed
+        
+        #jevois.sendSerial("Y-diff: " + str(yPos(obj0)-yPos(obj1)))
+
+        # intersection?
+        cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
+        # same y plane?
+        cond2 = abs(yPos(obj0)-yPos(obj1)) < y_deadband
+        #cond2 = True
+
+        return (cond1 and cond2)
 
 class ValueBuffer:
     def __init__(self, buffer_size):
@@ -176,8 +194,8 @@ class DeepSpace:
         editimg = raw.copy()
 
         if (cnts is not None) and (len(cnts) > 0):
-            # sorts contours by area (largest to smallest) and gets top 4
-            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
+            # sorts contours by area (largest to smallest) and gets top ...eight...
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:8]
 
             # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
@@ -197,11 +215,10 @@ class DeepSpace:
             for i in range(len(objs)-1):
                 obj0 = objs[i]
                 obj1 = objs[i+1]
+                
 
                 if (DetectedObject.isValidPair(obj0, obj1)):
                     pairs.append((objs[i], objs[i+1]))
-                else:
-                    data = "Intersection: " + str((line0.ly + line1.ly)/2 - FitLine.getIntersection(line0, line1)[1])
 
             if (len(pairs) > 0):
                 # sort pairs by area of both boxes
