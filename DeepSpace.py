@@ -122,6 +122,8 @@ class DetectedObject:
         #jevois.sendSerial("Y-diff: " + str(yPos(obj0)-yPos(obj1)))
 
         # intersection?
+        #jevois.sendSerial("thing 1: " + str(FitLine.getIntersection(line0, line1)[0]))
+        #jevois.sendSerial("thing 2: " + str((box0.y + box0.h + box1.y + box1.h)/ 2))
         cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
         # same y plane?
         cond2 = abs(yPos(obj0)-yPos(obj1)) < y_deadband
@@ -216,9 +218,11 @@ class DeepSpace:
                 obj0 = objs[i]
                 obj1 = objs[i+1]
                 
-
-                if (DetectedObject.isValidPair(obj0, obj1)):
-                    pairs.append((objs[i], objs[i+1]))
+                try:
+                    if (DetectedObject.isValidPair(obj0, obj1)):
+                        pairs.append((objs[i], objs[i+1]))
+                except np.linalg.LinAlgError: # "singular matrix"
+                    pass
 
             if (len(pairs) > 0):
                 # sort pairs by area of both boxes
