@@ -127,7 +127,7 @@ class DetectedObject:
         cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
         # same y plane?
         cond2 = abs(yPos(obj0)-yPos(obj1)) < y_deadband
-        #cond2 = True
+        cond2 = True
 
         return (cond1 and cond2)
 
@@ -197,7 +197,7 @@ class DeepSpace:
 
         if (cnts is not None) and (len(cnts) > 0):
             # sorts contours by area (largest to smallest) and gets top ...eight...
-            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:8]
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
 
             # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
@@ -258,7 +258,6 @@ class DeepSpace:
 
         # could be set to: raw, {hsv,rgb}filtered, eroded, dilated, edged, editimg
         outframe = editimg
-
         return outframe, text, data
 
     def process(self, inframe, outframe):
