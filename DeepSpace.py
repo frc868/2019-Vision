@@ -1,6 +1,7 @@
 import libjevois as jevois
 import cv2
 import numpy as np
+import statistics as stat
 
 ## Detect retroreflective field markings
 #
@@ -148,6 +149,16 @@ class ValueBuffer:
 
     def median(self):
         return np.median(self.buffer)
+    
+    def stdev(self):
+        return np.std(self.buffer)
+
+    def deriv(self):
+        rarr = []
+        for i in range(0, self.buffer_size-1):
+            rarr.append((self.buffer[i+1] - self.buffer[i]) / 2)
+
+        return rarr
 
 class DeepSpace:
     def __init__(self):
@@ -235,10 +246,6 @@ class DeepSpace:
                 # get objects of top pair
                 topL, topR = pairs[0]
 
-                # draw boxes and lines of these objects
-                topL.draw(editimg)
-                topR.draw(editimg)
-
                 # retrieve and store data 
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
 
@@ -251,10 +258,18 @@ class DeepSpace:
                 dist = self.distBuffer.median()
                 pos = self.posBuffer.median()
                 h_ratio = self.hRatioBuffer.median()
-
-                text = "Dist: " + str(dist) + " Pos: " + str(pos) \
-                       + " H_Ratio: " + str(h_ratio)
-                data = str(dist) + "," + str(pos) + "," + str(h_ratio)
+                
+                d = stat.stdev(self.distBuffer.deriv())   < 0.5
+                p = stat.stdev(self.posBuffer.deriv())    < 0.5
+                h = stat.stdev(self.hRatioBuffer.deriv()) < 0.5
+                # 2/3 correct
+                if (h and (d ^ p)) or (d and p): 
+                  text = "Dist: " + str(dist) + " Pos: " + str(pos) \
+                         + " H_Ratio: " + str(h_ratio)
+                  data = str(dist) + "," + str(pos) + "," + str(h_ratio)
+                  # draw boxes and lines of these objects
+                  topL.draw(editimg)
+                  topR.draw(editimg)
 
         # could be set to: raw, {hsv,rgb}filtered, eroded, dilated, edged, editimg
         outframe = editimg
