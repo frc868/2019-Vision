@@ -1,6 +1,7 @@
 import libjevois as jevois
 import cv2
 import numpy as np
+import statistics as stat
 
 ## Detect retroreflective field markings
 #
@@ -43,6 +44,7 @@ class BoundingBox:
     def height_ratio(boxL, boxR):
         return boxL.h/boxR.h
 
+    # distance, position, h ratio
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
@@ -61,6 +63,18 @@ class FitLine:
     def getLine(self):
         return (self.vx,self.vy,self.lx,self.ly)
 
+    def getIntersection(line0, line1):
+        slope0 = line0.slope()
+        slope1 = line1.slope()
+        x0 = line0.lx
+        x1 = line1.lx
+        y0 = line0.ly
+        y1 = line1.ly
+        a = np.array([[-slope0, 1], [-slope1, 1]])
+        b = np.array([slope0 + y0, slope1 + y1])
+
+        return np.linalg.solve(a,b)
+       
     def draw(self, img):
         point0 = (self.lx - self.vx*100, self.ly - self.vy*100)
         point1 = (self.lx + self.vx*100, self.ly + self.vy*100)
@@ -76,6 +90,47 @@ class DetectedObject:
     def draw(self, img):
         self.box.draw(img)
         self.line.draw(img)
+
+    def remove_dups(objs):
+        def xPos(obj):
+            return obj.box.x
+        objs = sorted(objs, key=xPos)
+        
+        i = 0
+        while (i < len(objs) - 1):
+            box0 = objs[i].box
+            box1 = objs[i+1].box
+            if (BoundingBox.distance(box0,box1) < (box0.w + box1.w)/2):
+                objs.remove(objs[i])
+            i += 1
+                
+        return objs
+        
+    def isValidPair(obj0, obj1):
+        line0 = obj0.line
+        line1 = obj1.line
+        box0 = obj0.box
+        box1 = obj1.box
+        
+        def yPos(obj):
+            return obj.box.y
+
+        # the further away we get, the less pixels bounding boxes take up
+        # so we need to scale it by distance between the two boxes
+        box_dist = BoundingBox.distance(box0, box1)
+        y_deadband = box_dist * 0.15 # tune as needed
+        
+        #jevois.sendSerial("Y-diff: " + str(yPos(obj0)-yPos(obj1)))
+
+        # intersection?
+        #jevois.sendSerial("thing 1: " + str(FitLine.getIntersection(line0, line1)[0]))
+        #jevois.sendSerial("thing 2: " + str((box0.y + box0.h + box1.y + box1.h)/ 2))
+        cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
+        # same y plane?
+        cond2 = abs(yPos(obj0)-yPos(obj1)) < y_deadband
+        cond2 = True
+
+        return (cond1 and cond2)
 
 class ValueBuffer:
     def __init__(self, buffer_size):
@@ -94,6 +149,16 @@ class ValueBuffer:
 
     def median(self):
         return np.median(self.buffer)
+    
+    def stdev(self):
+        return np.std(self.buffer)
+
+    def deriv(self):
+        rarr = []
+        for i in range(0, self.buffer_size-1):
+            rarr.append((self.buffer[i+1] - self.buffer[i]) / 2)
+
+        return rarr
 
 class DeepSpace:
     def __init__(self):
@@ -105,20 +170,20 @@ class DeepSpace:
         self.hRatioBuffer = ValueBuffer(buffer_size)
 
     def run(self, inframe):
-        text = ""
+        text = "868V "
         data = ",,"
         raw = inframe.getCvBGR()
         
         # filter by hsv values
         hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
-        hsvmin = np.array([53,  144, 41])
-        hsvmax = np.array([96, 255, 255])
+        hsvmin = np.array([39,  211, 106])
+        hsvmax = np.array([100, 255, 255])
         hsvfiltered = cv2.inRange(hsv, hsvmin, hsvmax)
 
         # filter by rgb values
-        rgb = cv2.cvtColor(blurred, cv2.COLOR_BGR2RGB)
-        rgbmin = np.array([0, 0, 100])
-        rgbmax = np.array([20, 255, 200])
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        rgbmin = np.array([0, 150, 0])
+        rgbmax = np.array([255, 255, 255])
         rgbfiltered = cv2.inRange(rgb, rgbmin, rgbmax)
 
         # combine both filtered version into one image
@@ -126,9 +191,9 @@ class DeepSpace:
         
         # erode, blur and dialate to remove noise
         kernel = np.ones((2,2),np.uint8)
-        eroded = cv2.erode(filtered.copy(), kernel, iterations = 2)
-        blurred = cv2.blur(eroded.copy(), kernel)
-        dilated = cv2.dilate(blurred.copy(), kernel, iterations = 2)
+        eroded = cv2.erode(hsvfiltered.copy(), kernel, iterations = 2)
+        blurred = cv2.blur(eroded.copy(), (2, 2))
+        dilated = cv2.dilate(blurred.copy(), kernel, iterations = 5)
 
 
         # detect edges
@@ -142,11 +207,13 @@ class DeepSpace:
         editimg = raw.copy()
 
         if (cnts is not None) and (len(cnts) > 0):
-            # sorts contours by area (largest to smallest) and gets top 4
+            # sorts contours by area (largest to smallest) and gets top ...eight...
             cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
 
             # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
+            #[obj.draw(editimg) for obj in objs]
+            objs = DetectedObject.remove_dups(objs)
 
             #[obj.draw(editimg) for obj in objs]
 
@@ -159,11 +226,14 @@ class DeepSpace:
             # create list of pairs of objects based on fitline's slope
             pairs = []
             for i in range(len(objs)-1):
-                slope0 = int(objs[i].line.slope())
-                slope1 = int(objs[i+1].line.slope())
-
-                if (slope0 < 0 and slope1 > 0):
-                    pairs.append((objs[i], objs[i+1]))
+                obj0 = objs[i]
+                obj1 = objs[i+1]
+                
+                try:
+                    if (DetectedObject.isValidPair(obj0, obj1)):
+                        pairs.append((objs[i], objs[i+1]))
+                except np.linalg.LinAlgError: # "singular matrix"
+                    pass
 
             if (len(pairs) > 0):
                 # sort pairs by area of both boxes
@@ -174,39 +244,35 @@ class DeepSpace:
                 pairs = sorted(pairs, key=pairArea, reverse=True)
 
                 # get objects of top pair
-                top0, top1 = pairs[0]
-
-                if (top0.box.x < top1.box.x):
-                    topL = top0
-                    topR = top1
-                else:
-                    topL = top1
-                    topR = top0
-
-                # draw boxes and lines of these objects
-                topL.draw(editimg)
-                topR.draw(editimg)
+                topL, topR = pairs[0]
 
                 # retrieve and store data 
                 dist, pos, h_ratio = BoundingBox.calculate(topL.box, topR.box)
 
                 # add newest calculations to respective buffers
-                distBuffer.addValue(dist)
-                posBuffer.addValue(pos)
-                hRatioBuffer.addValue(h_ratio)
+                self.distBuffer.addValue(dist)
+                self.posBuffer.addValue(pos)
+                self.hRatioBuffer.addValue(h_ratio)
 
                 # set the data to send to the median of the buffer
-                dist = distBuffer.median()
-                pos = posBuffer.median()
-                h_ratio = hRatioBuffer.median()
+                dist = self.distBuffer.median()
+                pos = self.posBuffer.median()
+                h_ratio = self.hRatioBuffer.median()
+                
+                d = stat.stdev(self.distBuffer.deriv())   < 1
+                p = stat.stdev(self.posBuffer.deriv())    < 1
+                h = stat.stdev(self.hRatioBuffer.deriv()) < 1
+                # 2/3 correct
+                if (h and (d ^ p)) or (d and p): 
+                  text = text + "Dist: " + str(dist) + " Pos: " + str(pos) \
+                         + " H_Ratio: " + str(h_ratio)
+                  data = str(dist) + "," + str(pos) + "," + str(h_ratio)
+                  # draw boxes and lines of these objects
+                  topL.draw(editimg)
+                  topR.draw(editimg)
 
-                text = "Dist: " + str(dist) + " Pos: " + str(pos) \
-                       + " H_Ratio: " + str(h_ratio)
-                data = str(dist) + "," + str(pos) + "," + str(h_ratio)
-
-        # could be set to: raw, filtered, eroded, dilated, edged, editimg
+        # could be set to: raw, {hsv,rgb}filtered, eroded, dilated, edged, editimg
         outframe = editimg
-
         return outframe, text, data
 
     def process(self, inframe, outframe):
@@ -222,7 +288,6 @@ class DeepSpace:
 
         # send the serial data
         jevois.sendSerial(data)
-
 
     def processNoUSB(self, inframe):
         # process the image and get just the serial data
