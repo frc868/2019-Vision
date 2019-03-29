@@ -125,10 +125,13 @@ class DetectedObject:
         # intersection?
         #jevois.sendSerial("thing 1: " + str(FitLine.getIntersection(line0, line1)[0]))
         #jevois.sendSerial("thing 2: " + str((box0.y + box0.h + box1.y + box1.h)/ 2))
-        cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
+        # cond1 = FitLine.getIntersection(line0, line1)[1] < (box0.y + box0.h + box1.y + box0.h)/2
+        cond1 = (line0.slope() < 0) and (line1.slope() > 0)
+
+        # jevois.sendSerial(str(FitLine.getIntersection(line0, line1)[1]) + " " + str((box0.y + box0.h + box1.y + box0.h)/2))
         # same y plane?
         cond2 = abs(yPos(obj0)-yPos(obj1)) < y_deadband
-        cond2 = True
+        # cond2 = True
 
         return (cond1 and cond2)
 
