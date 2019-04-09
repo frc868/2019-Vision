@@ -60,7 +60,7 @@ class BoundingBox:
     # returns the ratio of the heights of the two boxes
     @staticmethod
     def height_ratio(boxL, boxR):
-        return boxL.h/boxR.h
+        return (boxL.y-boxR.y)/BoundingBox.distance(boxL, boxR)
 
     # returns distance, position, and h ratio
     @staticmethod
@@ -255,7 +255,7 @@ class VisionSetup:
 
     @staticmethod
     def gyansys():
-        hsvmin = np.array([39,  211, 106])
+        hsvmin = np.array([50,  200, 75])
         hsvmax = np.array([100, 255, 255])
         rgbmin = np.array([0, 0, 0])
         rgbmax = np.array([255, 255, 255])
@@ -272,7 +272,7 @@ class VisionSetup:
         rgbmin = np.array([0, 0, 0])
         rgbmax = np.array([255, 255, 255])
         kernel = np.ones((2,2),np.uint8)
-        erode_iter = 2
+        erode_iter = 1
         dilate_iter = 5
 
         return VisionSetup(hsvmin, hsvmax, rgbmin, rgbmax, kernel, erode_iter, dilate_iter)
@@ -292,7 +292,7 @@ class DeepSpace:
         data = ",,"
         raw = inframe.getCvBGR() # raw, unaltered image
 
-        setup = VisionSetup.center_grove()
+        setup = VisionSetup.gyansys()
         
         # filter by hsv values
         hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
