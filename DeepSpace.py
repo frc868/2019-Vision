@@ -59,11 +59,7 @@ class BoundingBox:
 
     # returns the ratio of the heights of the two boxes
     @staticmethod
-<<<<<<< HEAD
     def angle(boxL, boxR):
-=======
-    def height_ratio(boxL, boxR):
->>>>>>> 4a1a6cd687fca0eecabe6dca2df831919b95f105
         return (boxL.y-boxR.y)/BoundingBox.distance(boxL, boxR)
 
     # returns distance, position, and h ratio
@@ -296,12 +292,7 @@ class DeepSpace:
         text = "868V "
         data = ",,"
         raw = inframe.getCvBGR() # raw, unaltered image
-
-<<<<<<< HEAD
         setup = VisionSetup.state()
-=======
-        setup = VisionSetup.gyansys()
->>>>>>> 4a1a6cd687fca0eecabe6dca2df831919b95f105
         
         # filter by hsv values
         hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
