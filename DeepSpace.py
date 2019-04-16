@@ -157,8 +157,9 @@ class DetectedObject:
         # the further away we get, the less pixels bounding boxes take up
         # so we need to scale it by distance between the two boxes
         box_dist = BoundingBox.distance(box0, box1)
-        y_deadband = box_dist * 0.15 # tune as needed
-        cond2 = abs(box0.y - box1.y) < y_deadband
+        #y_deadband = box_dist * 0.25 # tune as needed
+        #cond2 = abs(box0.y - box1.y) < y_deadband
+        cond2 = True
 
         return (cond1 and cond2)
 
@@ -379,9 +380,9 @@ class DeepSpace:
                 pos = self.posBuffer.median()
                 h_ratio = self.hRatioBuffer.median()
                 
-                d = stat.stdev(self.distBuffer.deriv())   < 1
-                p = stat.stdev(self.posBuffer.deriv())    < 1
-                h = stat.stdev(self.hRatioBuffer.deriv()) < 1
+                d = stat.stdev(self.distBuffer.deriv())   < 1.5
+                p = stat.stdev(self.posBuffer.deriv())    < 1.5
+                h = stat.stdev(self.hRatioBuffer.deriv()) < 1.5
                 # 2/3 conditions must be met
                 if (h and (d ^ p)) or (d and p): 
                   text = text + "Dist: " + str(dist) + " Pos: " + str(pos) \
