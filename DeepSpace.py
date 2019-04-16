@@ -59,15 +59,15 @@ class BoundingBox:
 
     # returns the ratio of the heights of the two boxes
     @staticmethod
-    def height_ratio(boxL, boxR):
-        return boxL.h/boxR.h
+    def angle(boxL, boxR):
+        return (boxL.y-boxR.y)/BoundingBox.distance(boxL, boxR)
 
     # returns distance, position, and h ratio
     @staticmethod
     def calculate(boxL, boxR):
         return BoundingBox.distance(boxL, boxR), \
                BoundingBox.position(boxL, boxR), \
-               BoundingBox.height_ratio(boxL, boxR)
+               BoundingBox.angle(boxL, boxR)
         
 class FitLine:
     def __init__(self, line):
@@ -255,7 +255,7 @@ class VisionSetup:
 
     @staticmethod
     def gyansys():
-        hsvmin = np.array([39,  211, 106])
+        hsvmin = np.array([50,  200, 75])
         hsvmax = np.array([100, 255, 255])
         rgbmin = np.array([0, 0, 0])
         rgbmax = np.array([255, 255, 255])
@@ -267,8 +267,9 @@ class VisionSetup:
 
     @staticmethod
     def state():
-        hsvmin = np.array([39,  211, 106])
-        hsvmax = np.array([100, 255, 255])
+        #hsvmin = np.array([39,  211, 106])
+        hsvmin = np.array([40,  140, 95])
+        hsvmax = np.array([90, 255, 255])
         rgbmin = np.array([0, 0, 0])
         rgbmax = np.array([255, 255, 255])
         kernel = np.ones((2,2),np.uint8)
@@ -292,7 +293,7 @@ class DeepSpace:
         data = ",,"
         raw = inframe.getCvBGR() # raw, unaltered image
 
-        setup = VisionSetup.center_grove()
+        setup = VisionSetup.state()
         
         # filter by hsv values
         hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
@@ -327,8 +328,8 @@ class DeepSpace:
         editimg = raw.copy()
 
         if (cnts is not None) and (len(cnts) > 0):
-            # sorts contours by area (largest to smallest) and gets top 4
-            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:4]
+            # sorts contours by area (largest to smallest) and gets top 6
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:6]
 
             # create a detected object for each contour
             objs = [DetectedObject(c) for c in cnts]
